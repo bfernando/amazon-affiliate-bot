@@ -57,6 +57,10 @@ class Config:
     # Paths
     BASE_DIR = Path(__file__).parent.parent
     OUTPUT_DIR = BASE_DIR / "output"
+    CURATED_DEALS_FILE = os.getenv(
+        "CURATED_DEALS_FILE",
+        str(BASE_DIR / "data" / "openclaw_morning_curated_deals.json"),
+    )
 
     # Amazon domains by region
     AMAZON_DOMAINS = {

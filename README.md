@@ -3,7 +3,8 @@
 Automatically finds tech products and affiliate opportunities from deal feeds, then posts to Twitter/X.
 
 Current behavior:
-- Tries fresh discounted tech deals first.
+- Tries OpenClaw morning curated list first.
+- Falls back to fresh discounted tech deals if curated list is missing/empty/exhausted.
 - If no new discounted deals are available, falls back to Amazon tech best sellers.
 - Uses Amazon affiliate links in every post.
 
@@ -40,6 +41,30 @@ cp .env.example .env
    - **ONLY_AMAZON_SHIPPED** (true/false)
    - **PRICE_RANGE_MIN/MAX** (e.g., 10/500)
    - **DEAL_CATEGORIES** (comma-separated list)
+   - **CURATED_DEALS_FILE** (default: `data/openclaw_morning_curated_deals.json`)
+
+### OpenClaw Morning Handoff Format
+The curated handoff file supports `.json` or `.csv`.
+
+JSON (preferred):
+```json
+{
+  "deals": [
+    {
+      "title": "Sony WH-1000XM5 Wireless Noise Cancelling Headphones",
+      "asin": "B09XS7JWHH",
+      "current_price": 278.00,
+      "original_price": 399.99,
+      "discount_percent": 30,
+      "affiliate_url": "https://www.amazon.com/dp/B09XS7JWHH?tag=twitterxthetechbff-20",
+      "source": "openclaw-morning-brief-2026-04-03"
+    }
+  ]
+}
+```
+
+CSV columns (minimum required): `title,asin,current_price`
+- Optional: `original_price,discount_percent,affiliate_url,amazon_url,source,description,rating,review_count,is_prime,is_amazon_shipped,category,image_url`
 
 ## Usage
 
@@ -71,6 +96,10 @@ News/article posting has been moved out of this repository into its own standalo
 ## Scheduling
 
 This project should run exactly one scheduler backend (Windows Task Scheduler, `launchd`, or cron) to avoid duplicate posts.
+Morning workflow:
+1. Generate/update the curated file before the first scheduled run.
+2. Keep hourly schedule unchanged; each run consumes curated deals first.
+3. If curated entries are exhausted or already posted, bot automatically falls back to RSS/Twitter, then bestsellers.
 
 Useful checks:
 
@@ -89,9 +118,9 @@ crontab -l
 
 Per run, the bot does this:
 
-1. Fetches deals from RSS sources (Reddit/Slickdeals/DealNews) and Twitter deal-account monitoring.
-2. Filters to tech products and valid affiliate-linked ASINs.
-3. Skips ASINs already present in `posted_deals.txt`.
+1. Loads OpenClaw curated candidates (`CURATED_DEALS_FILE`) and validates required affiliate fields.
+2. Skips ASINs already present in `posted_deals.txt`.
+3. If curated lane has no usable candidates, fetches RSS (Reddit/Slickdeals/DealNews) and Twitter deal-account sources.
 4. If no fresh discounted deal is available, fetches Amazon tech best sellers as fallback.
 5. Posts the best available candidate (if any).
 
@@ -124,6 +153,8 @@ amazon-affiliate-bot/
 │   │   └── tweet.py           # Tweet formatting
 │   └── poster/
 │       └── twitter.py         # Twitter API posting
+├── data/
+│   └── openclaw_morning_curated_deals.json  # Curated handoff template
 └── output/                    # Saved deal data
 ```
 

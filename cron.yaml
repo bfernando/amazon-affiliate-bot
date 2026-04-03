@@ -3,6 +3,7 @@
 #
 # Hourly cadence for deals lane:
 # - deal posts: hourly 7am-midnight
+# - curated handoff: update CURATED_DEALS_FILE before first morning run
 # All times in America/Los_Angeles (Pacific)
 #
 # Install with:

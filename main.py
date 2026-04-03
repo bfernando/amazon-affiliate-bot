@@ -116,7 +116,7 @@ def display_deals(deals):
             f"${deal.current_price:,.2f}",
             f"${deal.original_price:,.2f}" if deal.original_price > 0 else "-",
             f"{deal.discount_percent}%",
-            f"⭐ {deal.rating}" if deal.rating > 0 else "-",
+            f"* {deal.rating}" if deal.rating > 0 else "-",
         )
 
     console.print(table)
@@ -126,6 +126,7 @@ async def run(args):
     """Main execution."""
     scraper = AmazonDealScraper()
     fallback_to_bestsellers = False
+    used_curated_lane = False
 
     # Verify mode
     if args.verify:
@@ -133,13 +134,32 @@ async def run(args):
         poster.verify_credentials()
         return
 
+    cleanup_posted_file()
+    posted_asins = load_posted_asins()
+
     # Search or scrape
     if args.search:
         console.print(Panel(f"[bold cyan]Searching deals for: {args.search}[/bold cyan]"))
         deals = await scraper.search_deals(args.search, limit=args.limit)
     else:
-        console.print(Panel("[bold cyan]🔍 Scanning for tech deals...[/bold cyan]"))
-        deals = await scraper.get_tech_deals(limit_per_category=args.limit)
+        console.print(Panel("[bold cyan]Scanning OpenClaw morning curated list...[/bold cyan]"))
+        curated_deals = await scraper.get_curated_deals(limit=args.limit)
+        curated_count = len(curated_deals)
+        curated_deals = [d for d in curated_deals if d.asin not in posted_asins]
+        if curated_count and len(curated_deals) < curated_count:
+            console.print(f"[dim]Skipped {curated_count - len(curated_deals)} curated deal(s) already in posted_deals.txt[/dim]")
+
+        if curated_deals:
+            used_curated_lane = True
+            deals = curated_deals
+            console.print(f"[green]Using curated morning lane ({len(deals)} candidate deal(s)).[/green]")
+        else:
+            if curated_count:
+                console.print("[yellow]All curated deals were already posted. Falling back to RSS/Twitter sources.[/yellow]")
+            else:
+                console.print("[yellow]No curated deals available. Falling back to RSS/Twitter sources.[/yellow]")
+            console.print(Panel("[bold cyan]Scanning RSS/Twitter tech deals...[/bold cyan]"))
+            deals = await scraper.get_tech_deals(limit_per_category=args.limit)
 
     if not deals:
         if args.search:
@@ -153,8 +173,6 @@ async def run(args):
             return
 
     # Deduplicate against already-posted ASINs
-    cleanup_posted_file()
-    posted_asins = load_posted_asins()
     original_count = len(deals)
     deals = [d for d in deals if d.asin not in posted_asins]
     if len(deals) < original_count:
@@ -164,13 +182,23 @@ async def run(args):
         if args.search:
             console.print("[yellow]All found deals have already been posted[/yellow]")
             return
-        fallback_to_bestsellers = True
-        console.print("[yellow]All fresh deals were already posted. Falling back to Amazon tech best sellers.[/yellow]")
-        deals = await scraper.get_bestseller_deals(limit_per_category=max(3, min(args.limit, 5)))
-        deals = [d for d in deals if d.asin not in posted_asins]
+
+        if used_curated_lane:
+            console.print("[yellow]All curated deals were already posted. Falling back to RSS/Twitter sources.[/yellow]")
+            deals = await scraper.get_tech_deals(limit_per_category=args.limit)
+            original_count = len(deals)
+            deals = [d for d in deals if d.asin not in posted_asins]
+            if len(deals) < original_count:
+                console.print(f"[dim]Skipped {original_count - len(deals)} already-posted deal(s)[/dim]")
+
         if not deals:
-            console.print("[yellow]All fallback best sellers have already been posted[/yellow]")
-            return
+            fallback_to_bestsellers = True
+            console.print("[yellow]All fresh deals were already posted. Falling back to Amazon tech best sellers.[/yellow]")
+            deals = await scraper.get_bestseller_deals(limit_per_category=max(3, min(args.limit, 5)))
+            deals = [d for d in deals if d.asin not in posted_asins]
+            if not deals:
+                console.print("[yellow]All fallback best sellers have already been posted[/yellow]")
+                return
 
     # Display deals
     display_deals(deals)
@@ -237,3 +265,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

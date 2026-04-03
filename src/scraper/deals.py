@@ -1,10 +1,13 @@
 """RSS-based Amazon deal scraper - pulls tech deals from aggregator sites."""
+import csv
+import json
 import re
 import feedparser
 import httpx
 import requests
 from typing import List, Optional
 from dataclasses import dataclass, field
+from pathlib import Path
 from bs4 import BeautifulSoup
 from rich.console import Console
 from src.config import config
@@ -178,6 +181,43 @@ class AmazonDealScraper:
     def __init__(self):
         self.seen_asins = set()
 
+    async def get_curated_deals(self, limit: int = 10) -> List[Deal]:
+        """
+        Load OpenClaw-curated morning deals from JSON or CSV.
+
+        Expected minimum fields per row:
+        - title
+        - asin (or a parseable Amazon URL containing ASIN)
+        - current_price / price
+        """
+        curated_file = Path(config.CURATED_DEALS_FILE).expanduser()
+        if not curated_file.is_absolute():
+            curated_file = (config.BASE_DIR / curated_file).resolve()
+
+        if not curated_file.exists():
+            console.print(f"[yellow]No curated morning list found at {curated_file}[/yellow]")
+            return []
+
+        records = self._read_curated_records(curated_file)
+        if not records:
+            return []
+
+        deals: List[Deal] = []
+        seen = set()
+        for idx, record in enumerate(records, 1):
+            deal = self._parse_curated_record(record, idx=idx, source=f"openclaw-curated:{curated_file.name}")
+            if not deal:
+                continue
+            if deal.asin in seen:
+                continue
+            seen.add(deal.asin)
+            deals.append(deal)
+            if len(deals) >= limit:
+                break
+
+        console.print(f"[green]Loaded {len(deals)} curated morning deal(s) from {curated_file.name}[/green]")
+        return deals
+
     async def get_tech_deals(self, limit_per_category: int = 10) -> List[Deal]:
         """Fetch deals from all RSS feeds and Twitter/X deal accounts."""
         all_deals = []
@@ -238,6 +278,40 @@ class AmazonDealScraper:
         all_deals.sort(key=lambda d: (d.review_count, d.rating), reverse=True)
         console.print(f"[green]Total unique bestseller items: {len(all_deals)}[/green]")
         return all_deals
+
+    def _read_curated_records(self, curated_file: Path) -> List[dict]:
+        suffix = curated_file.suffix.lower()
+
+        if suffix == ".json":
+            try:
+                raw = json.loads(curated_file.read_text(encoding="utf-8"))
+            except Exception as e:
+                console.print(f"[red]Unable to parse curated JSON {curated_file.name}: {e}[/red]")
+                return []
+
+            if isinstance(raw, list):
+                rows = raw
+            elif isinstance(raw, dict) and isinstance(raw.get("deals"), list):
+                rows = raw["deals"]
+            else:
+                console.print(f"[red]Curated JSON must be a list or object with 'deals' list: {curated_file.name}[/red]")
+                return []
+            return [row for row in rows if isinstance(row, dict)]
+
+        if suffix == ".csv":
+            rows: List[dict] = []
+            try:
+                with open(curated_file, newline="", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        rows.append(dict(row))
+            except Exception as e:
+                console.print(f"[red]Unable to parse curated CSV {curated_file.name}: {e}[/red]")
+                return []
+            return rows
+
+        console.print(f"[red]Unsupported curated file type: {curated_file.suffix}. Use .json or .csv[/red]")
+        return []
 
     async def search_deals(self, query: str, limit: int = 15) -> List[Deal]:
         """Search deals by keyword across all feeds."""
@@ -301,6 +375,88 @@ class AmazonDealScraper:
                 deals.append(deal)
 
         return deals
+
+    def _parse_curated_record(self, row: dict, idx: int, source: str) -> Optional[Deal]:
+        title = str(row.get("title") or "").strip()
+        asin = str(row.get("asin") or "").strip().upper()
+
+        if not asin:
+            for candidate_url in [row.get("amazon_url"), row.get("url"), row.get("affiliate_url")]:
+                parsed = extract_asin(str(candidate_url or ""))
+                if parsed:
+                    asin = parsed
+                    break
+
+        if not title or not asin:
+            console.print(f"  [yellow]Skipping curated row {idx}: missing title or ASIN[/yellow]")
+            return None
+
+        if not re.match(r"^[A-Z0-9]{10}$", asin):
+            console.print(f"  [yellow]Skipping curated row {idx}: invalid ASIN '{asin}'[/yellow]")
+            return None
+
+        current_price = self._to_float(row.get("current_price"))
+        if current_price <= 0:
+            current_price = self._to_float(row.get("price"))
+        if current_price <= 0:
+            console.print(f"  [yellow]Skipping curated row {idx}: missing/invalid current_price[/yellow]")
+            return None
+
+        original_price = self._to_float(row.get("original_price"))
+        discount = int(round(self._to_float(row.get("discount_percent"))))
+        if discount <= 0 and original_price > current_price:
+            discount = int(round((original_price - current_price) / original_price * 100))
+        if original_price <= 0:
+            original_price = current_price
+
+        affiliate_url = str(row.get("affiliate_url") or "").strip()
+        if not affiliate_url:
+            affiliate_url = build_affiliate_url(asin)
+
+        amazon_url = str(row.get("amazon_url") or row.get("url") or "").strip()
+        if not amazon_url:
+            amazon_url = f"https://www.amazon.com/dp/{asin}"
+
+        return Deal(
+            title=title[:200],
+            asin=asin,
+            current_price=current_price,
+            original_price=original_price,
+            discount_percent=max(discount, 0),
+            rating=self._to_float(row.get("rating")),
+            review_count=int(self._to_float(row.get("review_count"))),
+            image_url=str(row.get("image_url") or "").strip(),
+            url=amazon_url,
+            affiliate_url=affiliate_url,
+            is_prime=self._to_bool(row.get("is_prime", False)),
+            is_amazon_shipped=self._to_bool(row.get("is_amazon_shipped", True)),
+            category=str(row.get("category") or "tech"),
+            deal_type="openclaw_curated",
+            source=str(row.get("source") or source),
+            description=str(row.get("description") or "").strip()[:300],
+        )
+
+    def _to_float(self, value) -> float:
+        if value is None:
+            return 0.0
+        if isinstance(value, (int, float)):
+            return float(value)
+        text = str(value).strip()
+        if not text:
+            return 0.0
+        text = text.replace("$", "").replace(",", "")
+        try:
+            return float(text)
+        except ValueError:
+            return 0.0
+
+    def _to_bool(self, value) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+        text = str(value).strip().lower()
+        return text in {"1", "true", "yes", "y", "on"}
 
     def _parse_entry(self, entry, source: str) -> Optional[Deal]:
         """Parse a single RSS entry into a Deal."""
