@@ -16,8 +16,8 @@ Current behavior:
 ### Installation
 ```bash
 # Clone the repository
-git clone https://github.com/bfernando/amazon-deals-bot.git
-cd amazon-deals-bot
+git clone https://github.com/bfernando/amazon-affiliate-bot.git
+cd amazon-affiliate-bot
 
 # Create and activate virtual environment
 python3 -m venv venv
@@ -112,7 +112,7 @@ If you see "not posting," the most common cause is that all eligible ASINs have 
 ## Project Structure
 
 ```
-amazon-deals-bot/
+amazon-affiliate-bot/
 ├── main.py                    # Entry point
 ├── requirements.txt
 ├── .env.example
@@ -132,4 +132,5 @@ amazon-deals-bot/
 All tweets include `#ad #affiliate` disclosure as required by FTC guidelines for affiliate marketing.
 
 ## Support
-For issues or feature requests, please open an issue on [GitHub](https://github.com/bfernando/amazon-deals-bot).
+For issues or feature requests, please open an issue on [GitHub](https://github.com/bfernando/amazon-affiliate-bot).
+
