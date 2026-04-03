@@ -1,0 +1,33 @@
+# ============================================================
+# Amazon Deals Bot - Cron Schedule (Mac Mini)
+#
+# Hourly cadence for deals lane:
+# - deal posts: hourly 7am-midnight
+# All times in America/Los_Angeles (Pacific)
+#
+# Install with:
+#   crontab /Users/jarvis/projects/amazon-deals-bot/cron.yaml
+#
+# Verify with:
+#   crontab -l
+# ============================================================
+
+# --- Deal posts (hourly, 7am-midnight) ---
+0 7 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 8 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 9 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 10 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 11 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 12 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 13 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 14 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 15 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 16 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 17 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 18 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 19 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 20 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 21 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 22 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 23 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
+0 0 * * * /Users/jarvis/projects/amazon-deals-bot/run_deal_post.sh >> /Users/jarvis/projects/amazon-deals-bot/bot.log 2>&1
